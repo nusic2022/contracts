@@ -114,9 +114,9 @@ contract MysteryBoxManager is Ownable{
 
 	function crowdFunding(uint256 amount_, address referer_) external {
 		require(_crowdFundingParams.startTimestamp <= block.timestamp,
-				'MysteryBoxManager: crowd funding is not start');
+			'MysteryBoxManager: crowd funding is not start');
 		require(_crowdFundingParams.endTimestamp >= block.timestamp,
-				'MysteryBoxManager: crowd funding is end');
+			'MysteryBoxManager: crowd funding is end');
 
 		(bool has_, ) = this.getIndex(_msgSender());
 		require(!has_, 'MysteryBoxManager: This address is in the beneficiary list');

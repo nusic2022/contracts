@@ -9,11 +9,14 @@ contract SNFT is Ownable, ERC721Enumerable {
 		using Counters for Counters.Counter;
 		Counters.Counter private _tokenIdTracker;
 		uint256 private _cap;
+		string public defaultTokenURI; // IPFS uri for metadata including NFT name, description, image, attributes etc.
 
 		mapping(address => bool) private _mintWhitelist;
 		mapping(address => bool) private _operators;
+    mapping(uint256 => string) private _tokenURIs;
 
 		event CapUpdated(uint256 cap);
+    event UpdateTokenURI(uint256 indexed tokenId, string tokenURI);
 
 		constructor(
 				string memory name_,
@@ -35,6 +38,11 @@ contract SNFT is Ownable, ERC721Enumerable {
 			_;
 		}
 
+		modifier onlyTokenIdExist(uint256 tokenId_) {
+			require(_exists(tokenId_), "NusicNFTCore: tokeId not exists");
+			_;
+		}
+
 		function _updateCap(uint256 cap_) private {
 				_cap = cap_;
 				emit CapUpdated(cap_);
@@ -44,7 +52,9 @@ contract SNFT is Ownable, ERC721Enumerable {
 				// Whitelist is MysteryBoxManager contract address
         uint256 _tokenId = _tokenIdTracker.current();
         _mint(to_, _tokenId);
+				_tokenURIs[_tokenId] = defaultTokenURI;
         _tokenIdTracker.increment();
+        emit UpdateTokenURI(_tokenId, defaultTokenURI);
         return _tokenId;
     }
 
@@ -79,4 +89,18 @@ contract SNFT is Ownable, ERC721Enumerable {
 		function isOperator(address address_) external view returns(bool) {
 			return _operators[address_];
 		}
+
+    function updateTokenURI(uint256 tokenId_, string calldata uri_) public onlyTokenIdExist(tokenId_) onlyWhitelisted {
+        _tokenURIs[tokenId_] = uri_;
+        emit UpdateTokenURI(tokenId_, uri_);
+    }
+
+		function tokenURI(uint256 tokenId_) public view virtual override onlyTokenIdExist(tokenId_) returns (string memory) {
+        return _tokenURIs[tokenId_];
+    }
+
+		function updateDefaultTokenURI(string calldata uri_) public onlyOperator {
+			defaultTokenURI = uri_;
+		}
+
 }
