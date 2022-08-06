@@ -378,11 +378,10 @@ contract MysteryBoxManager is Ownable{
 			info.eraBasis
 		);
 
-		if (unreleased > 0) {
-			info.releasedAmount = info.releasedAmount + unreleased;
-			token.mint(info.beneficiary, unreleased);
-			emit TokensReleased(info.beneficiary, unreleased);
-		}
+		require(unreleased > 0, "MysteryBoxManager: You don't have unreleased amount");
+		info.releasedAmount = info.releasedAmount + unreleased;
+		token.mint(info.beneficiary, unreleased);
+		emit TokensReleased(info.beneficiary, unreleased);
 	}
 
 	function _getReleasedAmount() private view returns (uint256) {
