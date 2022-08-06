@@ -3,7 +3,7 @@ pragma solidity ^0.8.8;
 
 import "./lib/Ownable.sol";
 import "./lib/Token/IERC20Mintable.sol";
-import "./lib/Token/IERC721Enumerable.sol";
+import "./interfaces/ISNFT.sol";
 
 contract MysteryBoxManager is Ownable{
 	// USDT address
@@ -11,10 +11,8 @@ contract MysteryBoxManager is Ownable{
 	// NUSIC token
 	IERC20Mintable public token;
 	// SNFT
-	IERC721Enumerable public snft;
+	ISNFT public snft;
 
-	uint256 public a = 100;
-	uint256 public k = 5;
 	uint256 public maxDays = 6;
 	uint256 public baseRate = 2000; // 0.2
 	uint256 public increatedRate = 200; // 0.02
@@ -63,13 +61,13 @@ contract MysteryBoxManager is Ownable{
 	event TokensReleased(address indexed beneficiary, uint256 amount);
 	event Withdraw(address indexed receiver, uint256 amount);
 
-	event CrowdFundingAdded(address account, uint256 price, uint256 amount);
+	event CrowdFundingAdded(address account, uint256 price, uint256 amount, uint256 tokenId_);
 	event AddReferer(address user, address referer);
 
 	constructor(address token_, address fundingToken_, address snft_) {
 		token = IERC20Mintable(token_);
 		fundingToken = IERC20Mintable(fundingToken_);
-		snft = IERC721Enumerable(snft_);
+		snft = ISNFT(snft_);
 	}
 
 	function getBeneficiary(uint256 index_) external view returns (VestingInfo memory) {
@@ -115,9 +113,6 @@ contract MysteryBoxManager is Ownable{
 	}
 
 	function crowdFunding(uint256 amount_, address referer_) external {
-		uint256 rate = randomRateByAmount[amount_];
-		require(rate > 0, "MysteryBoxManager: amount is not allowed");
-
 		require(_crowdFundingParams.startTimestamp <= block.timestamp,
 				'MysteryBoxManager: crowd funding is not start');
 		require(_crowdFundingParams.endTimestamp >= block.timestamp,
@@ -126,17 +121,19 @@ contract MysteryBoxManager is Ownable{
 		(bool has_, ) = this.getIndex(_msgSender());
 		require(!has_, 'MysteryBoxManager: This address is in the beneficiary list');
 
-		uint256 allowance = fundingToken.allowance(_msgSender(), address(this));
-		require(allowance >= amount_, "MysteryBoxManager: Please approve tokens before transferring");
-		uint256 fundingTokenBalance = fundingToken.balanceOf(_msgSender());
-		require(fundingTokenBalance >= amount_, "MysteryBoxManager: Balance is not enough");
+		require(fundingToken.allowance(_msgSender(), address(this)) >= amount_, "MysteryBoxManager: Please approve tokens before transferring");
+		require(fundingToken.balanceOf(_msgSender()) >= amount_, "MysteryBoxManager: Balance is not enough");
 
 		(uint256 rate_, uint256 reward_) = this.getCurrentRate(amount_);
 		require(reward_ > 0, 'MysteryBoxManager: tokens must be greater than 0');
 
-		// ###### 计算SNFT的数量
-		uint256 snftNumber = this.getSNFTNumber(amount_, rate);
-
+		uint256 tokenId_ = 0;
+		uint256 snftNumber_ = this.getSNFTNumber(amount_, block.timestamp);
+		if(snftNumber_ > 0) {
+			for(uint256 i = 0; i < snftNumber_; i++) {
+				tokenId_ = ISNFT(snft).mint(_msgSender());
+			}
+		}
 		// add beneficiary
 		VestingInfo memory info;
 
@@ -166,7 +163,7 @@ contract MysteryBoxManager is Ownable{
 			fundingToken.transfer(referer2, amount_ * referalRate[1] / 10000);
 		}
 
-		emit CrowdFundingAdded(_msgSender(), rate_, reward_);
+		emit CrowdFundingAdded(_msgSender(), rate_, reward_, tokenId_);
 	}
 
   function getUserTokenBalance() external view returns(uint256){
@@ -221,6 +218,7 @@ contract MysteryBoxManager is Ownable{
 	}
 
 	function releaseAll() external onlyOwner {
+		require(block.timestamp >= _crowdFundingParams.genesisTimestamp, "MysteryBoxManager: genesis block not start");
 		uint256 _releasable = this.releasableAll();
 		require(_releasable > 0, "MysteryBoxManager: no tokens are due!");
 
@@ -230,6 +228,7 @@ contract MysteryBoxManager is Ownable{
 	}
 
 	function release() external {
+		require(block.timestamp >= _crowdFundingParams.genesisTimestamp, "MysteryBoxManager: genesis block not start");
 		(bool has_, uint256 index_) = this.getIndex(_msgSender());
 		require(has_, "MysteryBoxManager: user not found in beneficiary list");
 		require(index_ >= 0 && index_ < _beneficiaries.length, "MysteryBoxManager: index out of range!");
@@ -249,6 +248,16 @@ contract MysteryBoxManager is Ownable{
 	function updateToken(address token_) external onlyOwner {
 		require(token_ != address(0), "MysteryBoxManager: token_ is the zero address!");
 		token = IERC20Mintable(token_);
+	}
+
+	function updateFundingToken(address token_) external onlyOwner {
+		require(token_ != address(0), "MysteryBoxManager: token_ is the zero address!");
+		fundingToken = IERC20Mintable(token_);
+	}
+
+	function updateSNFT(address token_) external onlyOwner {
+		require(token_ != address(0), "MysteryBoxManager: token_ is the zero address!");
+		snft = ISNFT(token_);
 	}
 
 	function updateTotalAmount(uint256 amount_) external onlyOwner {
@@ -277,9 +286,14 @@ contract MysteryBoxManager is Ownable{
 		}
 	}
 
-	function getSNFTNumber(uint256 amount_, uint256 randomess_) external view returns(uint256) {
-		// ######
-
+	function getSNFTNumber(uint256 amount_, uint256 salt_) external view returns(uint256 num_) {
+	 	uint256 randomeRange_ = randomRateByAmount[amount_];
+		if(randomeRange_ == 0) num_ = 0;
+		else if(randomeRange_ < 10000) {
+			uint256 _randomness = uint256(keccak256(abi.encode(block.number, amount_, salt_, msg.sender)));
+			uint256 _randomNumber = _randomness % 10000;
+			if(randomeRange_ >= _randomNumber) num_ = 1;
+		} else return num_ = randomeRange_ / 10000;
 	}
 
 	function updateRateParams(
@@ -331,10 +345,6 @@ contract MysteryBoxManager is Ownable{
 		require(
 			info_.genesisTimestamp + info_.cliff + info_.duration <= type(uint256).max,
 			"MysteryBoxManager: out of uint256 range!"
-		);
-		require(
-			info_.eraBasis > 0,
-			"MysteryBoxManager: eraBasis_ must be greater than 0!"
 		);
 
 		(bool has_, ) = this.getIndex(info_.beneficiary);

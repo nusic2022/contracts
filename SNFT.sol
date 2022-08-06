@@ -75,4 +75,8 @@ contract SNFT is Ownable, ERC721Enumerable {
         uint256 newCap = cap() + amount_;
         _updateCap(newCap);
     }
+
+		function isOperator(address address_) external view returns(bool) {
+			return _operators[address_];
+		}
 }
