@@ -4,12 +4,13 @@ pragma solidity ^0.8.8;
 import "./lib/Token/ERC721Enumerable.sol";
 import "./lib/Ownable.sol";
 import "./lib/Counters.sol";
+import "./lib/Strings.sol";
 
 contract SNFT is Ownable, ERC721Enumerable {
 		using Counters for Counters.Counter;
 		Counters.Counter private _tokenIdTracker;
 		uint256 private _cap;
-		string public defaultTokenURI; // IPFS uri for metadata including NFT name, description, image, attributes etc.
+		string public baseTokenURI; // IPFS uri for metadata including NFT name, description, image, attributes etc.
 
 		mapping(address => bool) private _mintWhitelist;
 		mapping(address => bool) private _operators;
@@ -52,9 +53,10 @@ contract SNFT is Ownable, ERC721Enumerable {
 				// Whitelist is MysteryBoxManager contract address
         uint256 _tokenId = _tokenIdTracker.current();
         _mint(to_, _tokenId);
-				_tokenURIs[_tokenId] = defaultTokenURI;
+				string memory uri_ = string(abi.encodePacked(baseTokenURI, Strings.toString(_tokenId)));
+				_tokenURIs[_tokenId] = uri_;
         _tokenIdTracker.increment();
-        emit UpdateTokenURI(_tokenId, defaultTokenURI);
+        emit UpdateTokenURI(_tokenId, uri_);
         return _tokenId;
     }
 
@@ -99,8 +101,8 @@ contract SNFT is Ownable, ERC721Enumerable {
         return _tokenURIs[tokenId_];
     }
 
-		function updateDefaultTokenURI(string calldata uri_) public onlyOperator {
-			defaultTokenURI = uri_;
+		function updateBaseTokenURI(string calldata uri_) public onlyOperator {
+			baseTokenURI = uri_;
 		}
 
 }
