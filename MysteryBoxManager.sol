@@ -22,7 +22,7 @@ contract MysteryBoxManager is Ownable{
 	// different funding amount will get different random rate to get SNFT
 	// Ex. funding 100 USDT will get 2% possibility: randomRateByAmount[100000000000000000000] = 200
 	// If funding  5000 USDT will get 100% possibility to have 1: randomRateByAmount[5000000000000000000000] = 10000
-	// If funding 10000 USDT will get 100% possibility to have 2: randomRateByAmount[10000000000000000000000] = 20000
+	// If funding 10000 USDT will get 100% possibility to have 3: randomRateByAmount[10000000000000000000000] = 30000
 	mapping(uint256 => uint256) public randomRateByAmount;
 
 	struct VestingInfo {
