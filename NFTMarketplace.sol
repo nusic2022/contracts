@@ -3,7 +3,7 @@ pragma solidity ^0.8.8;
 
 import "./lib/Context.sol";
 import "./lib/Token/IERC165.sol";
-import "./lib/Token/IERC721.sol";
+// import "./lib/Token/IERC721.sol";
 import "./lib/Token/IERC20.sol";
 import "./lib/Address.sol";
 import "./lib/Token/SafeERC20.sol";
@@ -14,6 +14,8 @@ import "./lib/Token/ERC165.sol";
 import "./lib/AccessControl.sol";
 import "./lib/AccessControlEnumerable.sol";
 import "./lib/Counters.sol";
+import "./interfaces/INusicNFTCore.sol";
+import "./interfaces/ISupportProofTokenFactory.sol";
 
 contract NFTMarketplace is AccessControlEnumerable {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -33,10 +35,12 @@ contract NFTMarketplace is AccessControlEnumerable {
     }
 
     EnumerableSet.AddressSet private _supportedPaymentTokens;
-    IERC721 public nftCore;
+		ISupportProofTokenFactory public _supportProofTokenFactory;
+    INusicNFTCore public nftCore;
     uint256 public feeDecimal;
     uint256 public feeRate;
     address public feeRecipient;
+		bool public isQuadratic = true;
     Counters.Counter private _orderIdTracker;
 
     mapping(uint256 => Order) public orders;
@@ -68,6 +72,7 @@ contract NFTMarketplace is AccessControlEnumerable {
     constructor(
         address nftAddress_,
         address paymentToken_,
+				address supportProofTokenFactory_,
         uint256 feeDecimal_,
         uint256 feeRate_,
         address feeRecipient_
@@ -81,7 +86,7 @@ contract NFTMarketplace is AccessControlEnumerable {
             "NFTMarketplace: feeRecipient_ is zero address"
         );
 
-        nftCore = IERC721(nftAddress_);
+        nftCore = INusicNFTCore(nftAddress_);
         _updateFeeRate(feeDecimal_, feeRate_);
         feeRecipient = feeRecipient_;
         _orderIdTracker.increment();
@@ -90,6 +95,7 @@ contract NFTMarketplace is AccessControlEnumerable {
         _setupRole(MAINTAINER_ROLE, _msgSender());
 
         _supportedPaymentTokens.add(paymentToken_);
+				_supportProofTokenFactory = ISupportProofTokenFactory(supportProofTokenFactory_);
     }
 
     modifier onlySupportedPaymentToken(address paymentToken_) {
@@ -238,7 +244,7 @@ contract NFTMarketplace is AccessControlEnumerable {
     }
 
     function updateNftCore(address _nftCoreAddress) external onlyRole(MAINTAINER_ROLE){
-        nftCore = IERC721(_nftCoreAddress);
+        nftCore = INusicNFTCore(_nftCoreAddress);
     }
 
     function updateFeeRecipient(address feeRecipient_) external onlyRole(MAINTAINER_ROLE){
@@ -356,6 +362,9 @@ contract NFTMarketplace is AccessControlEnumerable {
         _onSaleOrders.remove(orderId_);
         _onSaleOrdersOfOwner[_order.seller].remove(orderId_);
 
+				uint256 royality = nftCore.royality(_order.tokenId);
+				
+				// Charge fee
         uint256 _feeAmount = _calculateFee(orderId_);
         if (_feeAmount > 0) {
             IERC20(_order.paymentToken).safeTransferFrom(
@@ -364,12 +373,27 @@ contract NFTMarketplace is AccessControlEnumerable {
                 _feeAmount
             );
         }
+				// Send to seller
         IERC20(_order.paymentToken).safeTransferFrom(
             _msgSender(),
             _order.seller,
-            _order.price - _feeAmount
+            (_order.price - _feeAmount) * (100 - royality) / 100
         );
 
+				// Send commissions to supporters
+				uint256 _totalSharedAmount = (_order.price - _feeAmount) * royality / 100;
+				(address[] memory _supporters, uint256[] memory _amounts) = this.getAllSupports(orderId_, _totalSharedAmount);
+				for(uint256 i = 0; i < _supporters.length; i++) {
+					if(_amounts[i] > 0) {
+						IERC20(_order.paymentToken).safeTransferFrom(
+							_msgSender(),
+							_supporters[i],
+							_amounts[i]
+						);
+					}
+				}
+
+				// Send NFT to buyer
         nftCore.transferFrom(address(this), _msgSender(), _order.tokenId);
 
         emit OrderMatched(
@@ -382,4 +406,21 @@ contract NFTMarketplace is AccessControlEnumerable {
             block.timestamp
         );
     }
+		struct SupportData {
+				address supporter;
+				uint256 balance;
+		}
+		function getAllSupports(uint256 orderId_, uint256 totalAmount_) external view returns(address[] memory _supporters, uint256[] memory _amounts){
+			Order memory _order = orders[orderId_];
+			uint256 _tokenId = _order.tokenId;
+			(_supporters, _amounts) = _supportProofTokenFactory.getAllSupports(_tokenId, totalAmount_, true);
+		}
+
+		function updateSupportProofTokenFactory(address address_) external onlyRole(MAINTAINER_ROLE) {
+			_supportProofTokenFactory = ISupportProofTokenFactory(address_);
+		}
+
+		function updateIsQuadratic(bool isQuadratic_) external onlyRole(MAINTAINER_ROLE) {
+			isQuadratic = isQuadratic_;
+		}
 }

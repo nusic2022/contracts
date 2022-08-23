@@ -75,7 +75,7 @@ contract NusicNFTCore is
     }
 
     function _transfer(address from_, address to_, uint256 tokenId_) internal virtual override {
-        require(_transferable[tokenId_], "NusicNFTCore: Token is not transferable");
+        require(transferable(tokenId_), "NusicNFTCore: Token is not transferable");
         super._transfer(from_, to_, tokenId_);
     }
 
@@ -112,11 +112,13 @@ contract NusicNFTCore is
         // can be burned (destroyed), so we need a separate counter.
         uint256 _tokenId = _tokenIdTracker.current();
         _mint(to_, _tokenId);
+				_transferable[_tokenId] = false;
         _tokenIdTracker.increment();
         return _tokenId;
     }
 
     function mint(address to_, string calldata tokenURI_, uint256 royality_) public onlyWhitelisted returns (uint256){
+				require(royality_ >= 0 && royality_ <= 100, "NusicNFTCore: royality must be 0-100");
         uint256 _tokenId = mint(to_);
         updateTokenURI(_tokenId, tokenURI_);
         updateRoyality(_tokenId, royality_);
@@ -159,6 +161,7 @@ contract NusicNFTCore is
     }
 
     function updateRoyality(uint256 tokenId_, uint256 rate_) public onlyTokenIdExist(tokenId_) {
+				require(rate_ >= 0 && rate_ <= 100, "NusicNFTCore: royality must be 0-100");
         require((
             ownerOf(tokenId_) == _msgSender() && block.timestamp - _royalityChangeTimestamp[tokenId_] >= royaltyChangeInterval)
             || this.isOperator(_msgSender()),

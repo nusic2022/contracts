@@ -9,7 +9,7 @@ import "./interfaces/ITokenController.sol";
 import "./lib/AccessControlEnumerable.sol";
 
 contract SupportProofToken is
-	ERC20("Support Proof Token", "SPT"),
+	ERC20,
 	Ownable,
 	AccessControlEnumerable
 {
@@ -23,7 +23,10 @@ contract SupportProofToken is
 	address public supportToken;
 	address public nft;
 
-	constructor() {
+	constructor(
+		string memory name_,
+		string memory symbol_
+	) ERC20(name_, symbol_){
 		_setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
 		_setupRole(MINTER_ROLE, _msgSender());
 		_setupRole(BURNER_ROLE, _msgSender());
