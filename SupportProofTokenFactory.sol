@@ -120,6 +120,7 @@ contract SupportProofTokenFactory is Ownable {
 		uint256[] memory _amounts)
 	{
 		_supporters = supporters[tokenId_];
+		require(_supporters.length > 0, "No supporters");
 		_amounts = new uint256[](_supporters.length);
 		uint256 totalSupply = getSPTokenTotalSupply(tokenId_);
 		if(!isQuadratic) {
