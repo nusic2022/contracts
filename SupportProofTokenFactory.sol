@@ -7,24 +7,27 @@ import "./lib/Token/IERC20SupportProof.sol";
 import "./lib/Token/IERC721.sol";
 import "./SupportProofToken.sol";
 import "./lib/Strings.sol";
+import "./interfaces/INusicAllocationData.sol";
 
 contract SupportProofTokenFactory is Ownable {
-    using Strings for uint256;
+  using Strings for uint256;
 
 	IERC20Mintable public erc20; // CPT
 	IERC721 public nft; // CPN
+	INusicAllocationData public allocation;
 
 	mapping(uint256 => address) public SPTokens;
-    mapping(uint256 => address[]) public supporters;
-	uint256 public rate = 1000; // 1000 means 100 erc20 token will mint 1 spToken
+  mapping(uint256 => address[]) public supporters;
+	uint256 public rate = 1500; // 1500 means 1 erc20 token will mint 15 spToken
 
 	event SPTContractCreated(address spToken_, IERC20Mintable erc20_, IERC721 nft_, uint256 tokenId_);
     event Support(address spToken_, uint256 tokenId_, address supporter_, uint256 amount_);
     event Unsupport(address spToken_, uint256 tokenId_, address supporter_, uint256 amount_);
 
-	constructor(address erc20_, address nft_) {
+	constructor(address erc20_, address nft_, address allocationContract_) {
 		erc20 = IERC20Mintable(erc20_);
-		nft = IERC721(address(nft_));
+		nft = IERC721(nft_);
+		allocation = INusicAllocationData(allocationContract_);
 	}
 
 	function createSPToken(uint256 tokenId_) public returns(address _spToken) {
@@ -55,7 +58,7 @@ contract SupportProofTokenFactory is Ownable {
 		// If the SP Token contract has not deployed, create it.
 		if(_spToken == address(0x0)) _spToken = createSPToken(tokenId_);
 		// Mint SP tokens for the user
-		IERC20Mintable(_spToken).mint(msg.sender, amount_ * rate / 1e5);
+		IERC20Mintable(_spToken).mint(msg.sender, amount_ * rate / 100);
 		// Transfer supported tokens from user's account to this contract
 		IERC20Mintable(erc20).transferFrom(msg.sender, address(this), amount_);
         // Add support to array, the supporter in this array will not be deleted, will check the balanceOf sptoken
@@ -74,7 +77,7 @@ contract SupportProofTokenFactory is Ownable {
 		// Send SP Tokens to address(0x0) and destroy them
 		IERC20Mintable(_spToken).burn(msg.sender, amount_);
 		// Return tokens back to supporter
-		IERC20Mintable(erc20).transfer(msg.sender, amount_ / rate * 1e5);
+		IERC20Mintable(erc20).transfer(msg.sender, amount_ / rate * 100);
         emit Unsupport(_spToken, tokenId_, msg.sender, amount_);
 	}
 
@@ -136,6 +139,10 @@ contract SupportProofTokenFactory is Ownable {
 				_amounts[i] = sqrt(getSPTokenBalanceOfUser(tokenId_, _supporters[i])) * totalAmount_ / _total ;
 			}
 		}
+	}
+
+	function updateAllocationContract(address allocationContract_) public onlyOwner {
+		allocation = INusicAllocationData(allocationContract_);
 	}
 	
 	function sqrt(uint x) public pure returns (uint y) {

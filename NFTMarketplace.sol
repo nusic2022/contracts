@@ -16,6 +16,7 @@ import "./lib/AccessControlEnumerable.sol";
 import "./lib/Counters.sol";
 import "./interfaces/INusicNFTCore.sol";
 import "./interfaces/ISupportProofTokenFactory.sol";
+import "./interfaces/INusicAllocationData.sol";
 
 contract NFTMarketplace is AccessControlEnumerable {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -24,6 +25,7 @@ contract NFTMarketplace is AccessControlEnumerable {
     using Counters for Counters.Counter;
 
     bytes32 public constant MAINTAINER_ROLE = keccak256("MAINTAINER_ROLE");
+		INusicAllocationData public _allocation;
 
     struct Order {
         address seller;
@@ -73,6 +75,7 @@ contract NFTMarketplace is AccessControlEnumerable {
         address nftAddress_,
         address paymentToken_,
 				address supportProofTokenFactory_,
+				address allocationContract_,
         uint256 feeDecimal_,
         uint256 feeRate_,
         address feeRecipient_
@@ -96,6 +99,7 @@ contract NFTMarketplace is AccessControlEnumerable {
 
         _supportedPaymentTokens.add(paymentToken_);
 				_supportProofTokenFactory = ISupportProofTokenFactory(supportProofTokenFactory_);
+				_allocation = INusicAllocationData(allocationContract_);
     }
 
     modifier onlySupportedPaymentToken(address paymentToken_) {
@@ -423,4 +427,8 @@ contract NFTMarketplace is AccessControlEnumerable {
 		function updateIsQuadratic(bool isQuadratic_) external onlyRole(MAINTAINER_ROLE) {
 			isQuadratic = isQuadratic_;
 		}
+
+	function updateAllocationContract(address allocationContract_) public onlyRole(MAINTAINER_ROLE) {
+		_allocation = INusicAllocationData(allocationContract_);
+	}
 }
