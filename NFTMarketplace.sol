@@ -39,6 +39,7 @@ contract NFTMarketplace is AccessControlEnumerable {
     EnumerableSet.AddressSet private _supportedPaymentTokens;
 		ISupportProofTokenFactory public _supportProofTokenFactory;
     INusicNFTCore public nftCore;
+		mapping(uint256 => uint256) public _tradingTimes; // key: tokenId, value: times
     uint256 public feeDecimal;
     uint256 public feeRate;
     address public feeRecipient;
@@ -385,6 +386,8 @@ contract NFTMarketplace is AccessControlEnumerable {
         );
 
 				// Send commissions to supporters
+				// ###### 根据不同阶段，把佣金发给多组用户
+				// 参考 _tradingTimes
 				uint256 _totalSharedAmount = (_order.price - _feeAmount) * royality / 100;
 				(address[] memory _supporters, uint256[] memory _amounts) = this.getAllSupports(orderId_, _totalSharedAmount);
 				for(uint256 i = 0; i < _supporters.length; i++) {

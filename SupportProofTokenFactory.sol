@@ -31,7 +31,7 @@ contract SupportProofTokenFactory is Ownable {
 	}
 
 	function createSPToken(uint256 tokenId_) public returns(address _spToken) {
-        require(IERC721(nft).ownerOf(tokenId_) != address(0x0), "TokenId not exist");
+		require(IERC721(nft).ownerOf(tokenId_) != address(0x0), "TokenId not exist");
 		require(SPTokens[tokenId_] == address(0x0), "SPToken is created");
 		bytes memory bytecode = type(SupportProofToken).creationCode;
 		string memory _name = string(abi.encodePacked("Support Proof Token #", tokenId_.toString()));
@@ -39,10 +39,10 @@ contract SupportProofTokenFactory is Ownable {
 		bytecode = abi.encodePacked(bytecode, abi.encode(_name, _symbol));
 		bytes32 salt = keccak256(abi.encodePacked(nft, tokenId_));
 		assembly {
-            _spToken := create2(0, add(bytecode, 32), mload(bytecode), salt)
-            if iszero(extcodesize(_spToken)) {
-            	revert(0, 0)
-            }
+			_spToken := create2(0, add(bytecode, 32), mload(bytecode), salt)
+			if iszero(extcodesize(_spToken)) {
+				revert(0, 0)
+			}
 		}
 		IERC20SupportProof(_spToken).initialize(address(erc20), address(nft), tokenId_);
         SPTokens[tokenId_] = _spToken;
@@ -58,12 +58,13 @@ contract SupportProofTokenFactory is Ownable {
 		// If the SP Token contract has not deployed, create it.
 		if(_spToken == address(0x0)) _spToken = createSPToken(tokenId_);
 		// Mint SP tokens for the user
+		// ###### 发给多组用户
 		IERC20Mintable(_spToken).mint(msg.sender, amount_ * rate / 100);
 		// Transfer supported tokens from user's account to this contract
 		IERC20Mintable(erc20).transferFrom(msg.sender, address(this), amount_);
-        // Add support to array, the supporter in this array will not be deleted, will check the balanceOf sptoken
-        addSupport(tokenId_, msg.sender);
-        emit Support(_spToken, tokenId_, msg.sender, amount_);
+			// Add support to array, the supporter in this array will not be deleted, will check the balanceOf sptoken
+			addSupport(tokenId_, msg.sender);
+			emit Support(_spToken, tokenId_, msg.sender, amount_);
 	}
 
 	function unsupport(uint256 amount_, uint256 tokenId_) public {
@@ -75,16 +76,17 @@ contract SupportProofTokenFactory is Ownable {
 		// Check balance of SP Tokens
 		require(IERC20Mintable(_spToken).balanceOf(msg.sender) >= amount_, "Balance of SPToken is not enough");
 		// Send SP Tokens to address(0x0) and destroy them
+		// ###### 其他增发的部分怎么办？
 		IERC20Mintable(_spToken).burn(msg.sender, amount_);
 		// Return tokens back to supporter
 		IERC20Mintable(erc20).transfer(msg.sender, amount_ / rate * 100);
-        emit Unsupport(_spToken, tokenId_, msg.sender, amount_);
+			emit Unsupport(_spToken, tokenId_, msg.sender, amount_);
 	}
 
-    function addSupport(uint256 tokenId_, address supporter_) internal {
-        address[] storage _supporters = supporters[tokenId_];
-        _supporters.push(supporter_);
-    }
+	function addSupport(uint256 tokenId_, address supporter_) internal {
+		address[] storage _supporters = supporters[tokenId_];
+		_supporters.push(supporter_);
+	}
 
 	function getSPTokenBalanceOfUser(uint256 tokenId_, address user_) public view returns (uint256) {
 		return IERC20Mintable(SPTokens[tokenId_]).balanceOf(user_);
@@ -144,7 +146,7 @@ contract SupportProofTokenFactory is Ownable {
 	function updateAllocationContract(address allocationContract_) public onlyOwner {
 		allocation = INusicAllocationData(allocationContract_);
 	}
-	
+
 	function sqrt(uint x) public pure returns (uint y) {
 		uint z = (x + 1) / 2;
 		y = x;
